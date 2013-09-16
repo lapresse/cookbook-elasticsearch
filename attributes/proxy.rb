@@ -3,7 +3,7 @@ include_attribute "elasticsearch::nginx"
 
 # Try to load data bag item 'elasticsearch/aws' ------------------
 #
-users = Chef::DataBagItem.load('elasticsearch', 'users')['users'] rescue []
+users = Chef::DataBagItem.load('elasticsearch', 'users')[node.chef_environment]['users'] rescue []
 # ----------------------------------------------------------------
 
 # === NGINX ===
@@ -23,6 +23,11 @@ default.elasticsearch[:nginx][:passwords_file] = "#{node.elasticsearch[:path][:c
 # Set this to `true` if you want to use a tool like BigDesk
 #
 default.elasticsearch[:nginx][:allow_cluster_api] = false
+
+# Allow responding to unauthorized requests for `/status`,
+# returning `curl -I localhost:9200`
+#
+default.elasticsearch[:nginx][:allow_status] = false
 
 # Other Nginx proxy settings
 #

@@ -3,8 +3,10 @@ module Extensions
   # Creates an EBS volume based on passed parameters and attaches it to the instance
   # via the [Fog](http://rubydoc.info/gems/fog/Fog/Compute/AWS/Volume) library.
   #
-  # The credentials for accessing AWS API are loaded from `node.elasticsearch.cloud`,
-  # you need to provide volume properties such as _size_ in the `params[:ebs]` hash.
+  # The credentials for accessing AWS API are loaded from `node.elasticsearch.cloud`.
+  # Instead of using AWS access tokens, you can create the instance with a IAM role.
+  #
+  # You need to provide volume properties such as _size_ in the `params[:ebs]` hash.
   #
   # If `params[:snapshot_id]` is passed, the volume will be created from
   # the corresponding snapshot.
@@ -23,17 +25,21 @@ module Extensions
 
         Chef::Log.debug("Region: #{region}, instance ID: #{instance_id}")
 
-        aws = Fog::Compute.new :provider =>              'AWS',
-                               :region   =>              region,
-                               :aws_access_key_id =>     node.elasticsearch[:cloud][:aws][:access_key],
-                               :aws_secret_access_key => node.elasticsearch[:cloud][:aws][:secret_key]
-
+        fog_options = { :provider => 'AWS', :region => region }
+        if (access_key = node.elasticsearch[:cloud][:aws][:access_key]) &&
+            (secret_key = node.elasticsearch[:cloud][:aws][:secret_key])
+          fog_options.merge!(:aws_access_key_id => access_key, :aws_secret_access_key => secret_key)
+        else  # Lack of credentials implies a IAM role will provide keys
+          fog_options.merge!(:use_iam_profile => true)
+        end
+        aws = Fog::Compute.new(fog_options)
 
         server = aws.servers.get instance_id
 
         # Create EBS volume if the device is free
-        unless server.volumes.map(&:device).include?(device)
-          options = { :device                => device,
+        ebs_device = params[:ebs][:device] || device
+        unless server.volumes.map(&:device).include?(ebs_device)
+          options = { :device                => ebs_device,
                       :size                  => params[:ebs][:size],
                       :delete_on_termination => params[:ebs][:delete_on_termination],
                       :availability_zone     => server.availability_zone,

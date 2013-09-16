@@ -1,15 +1,18 @@
 # Load settings from data bag 'elasticsearch/settings'
 #
-settings = Chef::DataBagItem.load('elasticsearch', 'settings') rescue {}
+settings = Chef::DataBagItem.load('elasticsearch', 'settings')[node.chef_environment] rescue {}
 Chef::Log.debug "Loaded settings: #{settings.inspect}"
 
 # Initialize the node attributes with node attributes merged with data bag attributes
 #
-node.set[:elasticsearch] = DeepMerge.merge(node[:elasticsearch].to_hash, settings.to_hash)
+node.default[:elasticsearch] ||= {}
+node.normal[:elasticsearch]  ||= {}
+node.normal[:elasticsearch]    = DeepMerge.merge(node.default[:elasticsearch].to_hash, node.normal[:elasticsearch].to_hash)
+node.normal[:elasticsearch]    = DeepMerge.merge(node.normal[:elasticsearch].to_hash, settings.to_hash)
 
 # === VERSION AND LOCATION
 #
-default.elasticsearch[:version]       = "0.20.1"
+default.elasticsearch[:version]       = "0.90.1"
 default.elasticsearch[:host]          = "http://download.elasticsearch.org"
 default.elasticsearch[:repository]    = "elasticsearch/elasticsearch"
 default.elasticsearch[:filename]      = "elasticsearch-#{node.elasticsearch[:version]}.tar.gz"
@@ -31,13 +34,6 @@ default.elasticsearch[:path][:logs] = "/usr/local/var/log/elasticsearch"
 
 default.elasticsearch[:pid_path]  = "/usr/local/var/run/elasticsearch"
 default.elasticsearch[:pid_file]  = "#{node.elasticsearch[:pid_path]}/#{node.elasticsearch[:node][:name].to_s.gsub(/\W/, '_')}.pid"
-
-# Deprecation notice for legacy path configuration
-Chef::Log.warn "DEPRECATION WARNING! The 'conf_path', 'data_path' and 'log_path' attributes have changed, and will be removed in the next release. Please review your attributes."
-default.elasticsearch[:conf_path] = default.elasticsearch[:path][:conf]
-default.elasticsearch[:data_path] = default.elasticsearch[:path][:data]
-default.elasticsearch[:log_path]  = default.elasticsearch[:path][:logs]
-
 
 # === MEMORY
 #
@@ -68,9 +64,11 @@ default.elasticsearch[:discovery][:zen][:minimum_master_nodes] = 1
 default.elasticsearch[:gateway][:type] = 'local'
 default.elasticsearch[:gateway][:expected_nodes] = 1
 
-default.elasticsearch[:cloud][:node][:auto_attributes] = true
-
 default.elasticsearch[:thread_stack_size] = "256k"
+
+# === CUSTOM CONFIGURATION
+#
+default.elasticsearch[:custom_config] = {}
 
 # --------------------------------------------------
 # NOTE: Setting the attributes for elasticsearch.yml
@@ -96,3 +94,13 @@ default.elasticsearch[:thread_stack_size] = "256k"
 #
 # The default attributes set by the cookbook configure a minimal set inferred from the environment
 # (eg. memory settings, node name), or reasonable defaults for production.
+#
+# The template is based on the elasticsearch.yml file from the Elasticsearch distribution;
+# to set other configurations, set the `node.elasticsearch[:custom_config]` attribute in the
+# node configuration, `elasticsearch/settings` data bag, role/environment definition, etc:
+#
+#     // ...
+#     'threadpool.index.type' => 'fixed',
+#     'threadpool.index.size' => '2'
+#     // ...
+#

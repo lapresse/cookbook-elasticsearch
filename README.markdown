@@ -30,9 +30,11 @@ If you include the `elasticsearch::aws` recipe, the
 [AWS Cloud Plugin](http://github.com/elasticsearch/elasticsearch-cloud-aws) will be installed on the node,
 allowing you to use the _Amazon_ AWS-related features (node auto-discovery, etc).
 Set your AWS credentials either in the "elasticsearch/aws" data bag, or directly in the role/node configuration.
+Instead of using AWS access tokens, you can create the instance with a
+[IAM role](http://aws.amazon.com/iam/faqs/#How_do_i_get_started_with_IAM_roles_for_EC2_instances).
 
 If you include the `elasticsearch::data` and `elasticsearch::ebs` recipes, an EBS volume will be automatically
-created, formatted and mounted so you can use it as a local gateway for _Elasticsearcg_.
+created, formatted and mounted so you can use it as a local gateway for _Elasticsearch_.
 When the EBS configuration contains a `snapshot_id` value, it will be created with data from the corresponding snapshot. See the `attributes/data` file for more information.
 
 If you include the `elasticsearch::proxy` recipe, it will configure the _Nginx_ server as
@@ -44,7 +46,7 @@ Usage
 -----
 
 For an overview, please read the tutorial on
-[deploying elasticsearch with _Chef Solo_](http://www.elasticsearch.org/tutorials/2012/03/21/deploying-elasticsearch-with-chef-solo.html)
+[deploying elasticsearch with _Chef Solo_](http://www.elasticsearch.org/tutorials/deploying-elasticsearch-with-chef-solo/)
 which uses this cookbook.
 
 For _Chef Server_ based deployment, include the recipes you want to be executed in a
@@ -67,11 +69,13 @@ the information in an "elasticsearch" _data bag_:
     mkdir -p ./data_bags/elasticsearch
     echo '{
       "id" : "aws",
-      "discovery" : { "type": "ec2" },
+      "_default" : {
+        "discovery" : { "type": "ec2" },
 
-      "cloud"   : {
-        "aws"     : { "access_key": "YOUR ACCESS KEY", "secret_key": "YOUR SECRET ACCESS KEY" },
-        "ec2"     : { "security_group": "elasticsearch" }
+        "cloud"   : {
+          "aws"     : { "access_key": "YOUR ACCESS KEY", "secret_key": "YOUR SECRET ACCESS KEY" },
+          "ec2"     : { "security_group": "elasticsearch" }
+        }
       }
     }' >> ./data_bags/elasticsearch/aws.json
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,10 +131,12 @@ Usernames and passwords may be stored in a data bag `elasticsearch/users`:
     mkdir -p ./data_bags/elasticsearch
     echo '{
       "id" : "users",
-      "users" : [
-        {"username" : "USERNAME", "password" : "PASSWORD"},
-        {"username" : "USERNAME", "password" : "PASSWORD"}
-      ]
+      "_default" : {
+        "users" : [
+          {"username" : "USERNAME", "password" : "PASSWORD"},
+          {"username" : "USERNAME", "password" : "PASSWORD"}
+        ]
+      }
     }
     ' >> ./data_bags/elasticsearch/users.json
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -148,6 +154,9 @@ run `chef-client` on the node(s):
     knife ssh name:elasticsearch* 'sudo chef-client'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Please note that all data bags _must_ have attributes enclosed in an environment
+(use the `_default` environment), as suggested by the Chef
+[documentation](http://docs.opscode.com/chef/essentials_data_bags.html#use-data-bags-with-environments).
 
 Testing with Vagrant
 --------------------
@@ -156,7 +165,7 @@ The cookbook comes with a [`Vagrantfile`](https://github.com/elasticsearch/cookb
 [_Vagrant_](http://vagrantup.com/), a tool for building virtualized infrastructures.
 
 First, make sure, you have both _VirtualBox_ and _Vagrant_
-[installed](http://vagrantup.com/docs/getting-started/index.html).
+[installed](http://docs.vagrantup.com/v1/docs/getting-started/index.html).
 
 Then, clone this repository into an `elasticsearch` directory on your development machine:
 
@@ -200,13 +209,13 @@ You may want to test-drive this cookbook on a different distribution; check out 
 Launch the virtual machine (it will download the box unless you already have it):
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~bash
-    time bundle exec vagrant up precise64
+    time CHEF=latest bundle exec vagrant up precise64
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The machine will be started and automatically provisioned with
 [_chef-solo_](http://vagrantup.com/v1/docs/provisioners/chef_solo.html).
-(Note: To use the latest version of Chef, run `CHEF=latest vagrant up precise64`.
-You may substitute _latest_ with a specific version.)
+(Note: You may substitute _latest_ with a specific Chef version.
+Set the `UPDATE` environment variable to update packages on the machine as well.)
 
 You'll see _Chef_ debug messages flying by in your terminal, downloading, installing and configuring _Java_,
 _Nginx_, _Elasticsearch_, and all the other components.

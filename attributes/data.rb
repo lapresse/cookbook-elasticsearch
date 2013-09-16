@@ -53,6 +53,26 @@
 #    }
 #
 #
+# Some kernels attach EBS devices to `/dev/xvd*` instead of `/dev/sd*`. You can set a specific name
+# with the `ebs.device` property:
+#
+#    {
+#      "elasticsearch": {
+#        "data" : {
+#          "devices" : {
+#            "/dev/xvda2" : {
+#              # ...
+#              "ebs" : {
+#                # ...
+#                "device" : "/dev/sda2"
+#              }
+#            }
+#          }
+#        }
+#      }
+#    }
+#
+#
 # When you define a `snapshot_id` property for an EBS device, it will be created from that snapshot,
 # having all the data available in the snapshot:
 #
@@ -72,6 +92,13 @@
 #      }
 #    }
 #
+# Note, that you have to verify the path to the device file: in some environments, these will
+# have the format of `/dev/sd*`, on others `/dev/xvd*`, etc.
+#
 data = Chef::DataBagItem.load('elasticsearch', 'data')[node.chef_environment] rescue {}
 
 default.elasticsearch[:data][:devices] = data['devices'] || {}
+
+# Perform package update (https://github.com/opscode-cookbooks/build-essential#usage)
+#
+node.default.build_essential.compiletime = true if node.recipes.any? { |r| r =~ /elasticsearch::ebs|build-essential/ }
